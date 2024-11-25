@@ -1,0 +1,207 @@
+Database Schema: Designing tables for customers, memberships, services, bookings, payments, and reviews.
+Data Manipulation: Using INSERT, UPDATE, and DELETE queries to manage data.
+Complex Queries: Using JOINs, GROUP BY, HAVING, and subqueries for business logic.
+Stored Procedures and Functions: Writing procedures for tasks like calculating the total price of services in a booking, and updating membership status.
+Transactions: Ensuring the integrity of operations like booking services or updating membership information.
+
+Steps to Build the Project
+Define the Database Schema:
+
+Tables: Customers, Memberships, Services, Bookings, Payments, Reviews, etc.
+Relationships: Define foreign keys to represent relationships between tables (e.g., CustomerID in Bookings, ServiceID in Bookings).
+Data Types: Choose appropriate data types for each field (e.g., VARCHAR, DATE, DECIMAL).
+
+
+Create the Tables:
+teps to Build the Project
+Define the Database Schema:
+
+Tables: Customers, Memberships, Services, Bookings, Payments, Reviews, etc.
+Relationships: Define foreign keys to represent relationships between tables (e.g., CustomerID in Bookings, ServiceID in Bookings).
+Data Types: Choose appropriate data types for each field (e.g., VARCHAR, DATE, DECIMAL).
+Create the Tables:
+
+sql
+Copy code
+CREATE DATABASE spa_db;
+
+USE spa_db;
+
+-- Customers Table
+CREATE TABLE Customers (
+    CustomerID INT AUTO_INCREMENT PRIMARY KEY,
+    FirstName VARCHAR(100),
+    LastName VARCHAR(100),
+    Email VARCHAR(150) UNIQUE,
+    Phone VARCHAR(15),
+    Address VARCHAR(255),
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Memberships Table
+CREATE TABLE Memberships (
+    MembershipID INT AUTO_INCREMENT PRIMARY KEY,
+    CustomerID INT,
+    MembershipType VARCHAR(100), -- e.g., 'Silver', 'Gold', 'Platinum'
+    StartDate DATE,
+    EndDate DATE,
+    Status VARCHAR(50), -- e.g., 'Active', 'Expired'
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
+);
+
+-- Services Table
+CREATE TABLE Services (
+    ServiceID INT AUTO_INCREMENT PRIMARY KEY,
+    ServiceName VARCHAR(150),
+    Description TEXT,
+    Price DECIMAL(10, 2), -- price for each service
+    Duration INT -- duration of service in minutes
+);
+
+-- Bookings Table (Many-to-many relationship between Customers and Services)
+CREATE TABLE Bookings (
+    BookingID INT AUTO_INCREMENT PRIMARY KEY,
+    CustomerID INT,
+    ServiceID INT,
+    BookingDate DATE,
+    BookingTime TIME,
+    Status VARCHAR(50), -- e.g., 'Confirmed', 'Completed', 'Cancelled'
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
+    FOREIGN KEY (ServiceID) REFERENCES Services(ServiceID)
+);
+
+-- Payments Table
+CREATE TABLE Payments (
+    PaymentID INT AUTO_INCREMENT PRIMARY KEY,
+    BookingID INT,
+    PaymentDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    Amount DECIMAL(10, 2),
+    PaymentMethod VARCHAR(50), -- e.g., 'Credit Card', 'Cash'
+    PaymentStatus VARCHAR(50), -- e.g., 'Completed', 'Pending'
+    FOREIGN KEY (BookingID) REFERENCES Bookings(BookingID)
+);
+
+-- Reviews Table
+CREATE TABLE Reviews (
+    ReviewID INT AUTO_INCREMENT PRIMARY KEY,
+    CustomerID INT,
+    ServiceID INT,
+    Rating INT, -- Rating between 1 to 5
+    ReviewText TEXT,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
+    FOREIGN KEY (ServiceID) REFERENCES Services(ServiceID)
+);
+Insert Data: Add some sample data to the tables for testing purposes.
+sql
+Copy code
+-- Insert some customers
+INSERT INTO Customers (FirstName, LastName, Email, Phone, Address) 
+VALUES ('John', 'Doe', 'john.doe@example.com', '1234567890', '123 Elm St');
+INSERT INTO Customers (FirstName, LastName, Email, Phone, Address) 
+VALUES ('Jane', 'Smith', 'jane.smith@example.com', '0987654321', '456 Oak St');
+
+-- Insert some services
+INSERT INTO Services (ServiceName, Description, Price, Duration) 
+VALUES ('Massage', 'Full body massage', 50.00, 60);
+INSERT INTO Services (ServiceName, Description, Price, Duration) 
+VALUES ('Facial', 'Hydrating facial treatment', 40.00, 45);
+
+-- Insert memberships
+INSERT INTO Memberships (CustomerID, MembershipType, StartDate, EndDate, Status) 
+VALUES (1, 'Gold', '2024-01-01', '2025-01-01', 'Active');
+INSERT INTO Memberships (CustomerID, MembershipType, StartDate, EndDate, Status) 
+VALUES (2, 'Silver', '2024-03-01', '2025-03-01', 'Active');
+Write SQL Queries:
+Get all bookings for a customer:
+sql
+Copy code
+SELECT b.BookingID, s.ServiceName, b.BookingDate, b.BookingTime, b.Status
+FROM Bookings b
+JOIN Services s ON b.ServiceID = s.ServiceID
+WHERE b.CustomerID = 1;
+Get total spending of a customer (e.g., total payments made for bookings):
+sql
+Copy code
+SELECT SUM(p.Amount) AS TotalSpent
+FROM Payments p
+JOIN Bookings b ON p.BookingID = b.BookingID
+WHERE b.CustomerID = 1;
+Get all reviews for a service:
+sql
+Copy code
+SELECT c.FirstName, c.LastName, r.Rating, r.ReviewText
+FROM Reviews r
+JOIN Customers c ON r.CustomerID = c.CustomerID
+WHERE r.ServiceID = 1;
+Stored Procedures:
+Procedure to calculate total amount spent by a customer:
+sql
+Copy code
+DELIMITER $$
+
+CREATE PROCEDURE GetTotalSpent(IN customer_id INT)
+BEGIN
+    SELECT SUM(p.Amount) AS TotalSpent
+    FROM Payments p
+    JOIN Bookings b ON p.BookingID = b.BookingID
+    WHERE b.CustomerID = customer_id;
+END $$
+
+DELIMITER ;
+Procedure to update membership status:
+sql
+Copy code
+DELIMITER $$
+
+CREATE PROCEDURE UpdateMembershipStatus(IN membership_id INT)
+BEGIN
+    DECLARE current_date DATE;
+    SET current_date = CURDATE();
+    UPDATE Memberships
+    SET Status = CASE 
+        WHEN EndDate < current_date THEN 'Expired' 
+        ELSE 'Active' 
+    END
+    WHERE MembershipID = membership_id;
+END $$
+
+DELIMITER ;
+Transactions: For booking a service and making a payment, you might want to use transactions to ensure both actions are successful:
+sql
+Copy code
+START TRANSACTION;
+
+-- Insert booking
+INSERT INTO Bookings (CustomerID, ServiceID, BookingDate, BookingTime, Status)
+VALUES (1, 1, '2024-11-24', '10:00:00', 'Confirmed');
+
+-- Get the last inserted BookingID
+SET @BookingID = LAST_INSERT_ID();
+
+-- Insert payment
+INSERT INTO Payments (BookingID, Amount, PaymentMethod, PaymentStatus)
+VALUES (@BookingID, 50.00, 'Credit Card', 'Completed');
+
+-- Commit transaction
+COMMIT;
+Advanced Queries:
+Get the most popular service based on the number of bookings:
+sql
+Copy code
+SELECT s.ServiceName, COUNT(b.BookingID) AS BookingsCount
+FROM Services s
+JOIN Bookings b ON s.ServiceID = b.ServiceID
+GROUP BY s.ServiceName
+ORDER BY BookingsCount DESC
+LIMIT 1;
+Get the customers who have made the most reviews:
+sql
+Copy code
+SELECT c.FirstName, c.LastName, COUNT(r.ReviewID) AS ReviewCount
+FROM Customers c
+JOIN Reviews r ON c.CustomerID = r.CustomerID
+GROUP BY c.CustomerID
+ORDER BY ReviewCount DESC
+LIMIT 3;
+
